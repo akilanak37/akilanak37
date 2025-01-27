@@ -1,0 +1,36 @@
+from flask import Flask, request, render_template
+import numpy as np
+import pandas as pd
+from sklearn.svm import SVC
+from feature import FeatureExtraction
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+import warnings
+import pickle
+warnings.filterwarnings('ignore')
+# Load the SVM model
+with open("pickle/model_svm.pkl", "rb") as file:
+    svm_model = pickle.load(file)
+app = Flask(__name__)
+@app.route("/", methods=["GET", "POST"])
+def index():
+    if request.method == "POST":
+        url = request.form["url"]
+        obj = FeatureExtraction(url)
+        x = np.array(obj.getFeaturesList()).reshape(1, 30)
+        y_pred = svm_model.predict(x)[0]
+        y_pro_phishing = svm_model.predict_proba(x)[0, 0]
+        y_pro_non_phishing = svm_model.predict_proba(x)[0, 1]
+        predicted_label = "Phishing" if y_pred == "phishing" else "Not Phishing"
+        y_true = [0]  # Example: Assuming the true label is 0 for non-phishing
+        y_pred_binary = 1 if y_pred == 'phishing' else 0
+        accuracy = accuracy_score(y_true, [y_pred_binary])
+        precision = precision_score(y_true, [y_pred_binary])
+        recall = recall_score(y_true, [y_pred_binary])
+        f1 = f1_score(y_true, [y_pred_binary])
+        pred = "It is {0:.2f} % safe to go".format(y_pro_non_phishing * 100)
+        return render_template('index.html', xx=round(y_pro_non_phishing, 2), url=url,
+        accuracy=accuracy, precision=precision, recall=recall, f1=f1,
+        predicted_label=predicted_label)
+    return render_template("index.html", xx=-1)
+if __name__ == "__main__":
+    app.run(debug=True)
